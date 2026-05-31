@@ -107,13 +107,23 @@ jobs:
           # Copy language file to scripts directory
           Copy-Item "scripts/Languages/ChineseSimplified.isl" "scripts/" -ErrorAction SilentlyContinue
 
+          # Verify staging directory
+          Write-Host "Staging directory:"
+          Get-ChildItem "staging/" | Select-Object Name
+          Write-Host "Logo exists: $(Test-Path 'staging/logo.ico')"
+
           # Run Inno Setup
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
           }
           Write-Host "Using ISCC: $iscc"
-          & $iscc "scripts/compile_windows_arm64_exe-inno.iss"
+          Write-Host "PWD: $(Get-Location)"
+          & $iscc /O"$PWD\output" "$PWD\scripts\compile_windows_arm64_exe-inno.iss"
+
+          # Verify output
+          Write-Host "Output directory:"
+          Get-ChildItem "output/" -ErrorAction SilentlyContinue
 
       - name: Get version
         id: get_version

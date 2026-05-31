@@ -18,9 +18,9 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequiredOverridesAllowed=dialog
-OutputDir=output
+OutputDir=..\output
 OutputBaseFilename=LocalSend-{#MyAppVersion}-windows-arm64-installer
-SetupIconFile=staging\logo.ico
+SetupIconFile=..\staging\logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
 SolidCompression=yes
@@ -61,11 +61,11 @@ Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "staging\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "staging\{#MyAppExeName}.manifest"; DestDir: "{app}"; Flags: ignoreversion
-Source: "staging\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "staging\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "staging\settings.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\staging\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\staging\{#MyAppExeName}.manifest"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\staging\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\staging\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\staging\settings.json"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}";
