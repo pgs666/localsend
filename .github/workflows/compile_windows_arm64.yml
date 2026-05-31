@@ -37,7 +37,7 @@ jobs:
 
       - name: Compile for Windows
         working-directory: app
-        run: flutter build windows --release
+        run: flutter build windows --release --verbose
 
       - name: Check build output
         shell: pwsh
