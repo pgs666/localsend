@@ -1,0 +1,81 @@
+name: Release Windows ARM64
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Run ID of the compile_windows_arm64 workflow (e.g. 26720810232)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download build artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh run download ${{ inputs.build_run_id }} \
+            --repo ${{ github.repository }} \
+            --name windows-arm64-build \
+            --dir build-artifact
+
+      - name: Extract build to staging
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "staging"
+          Expand-Archive -Path "build-artifact/LocalSend-windows-arm64.zip" -DestinationPath "staging/"
+          Copy-Item -Path "app/assets/packaging/logo.ico" -Destination "staging/"
+          Write-Host "Staging contents:"
+          Get-ChildItem "staging/" | Select-Object Name
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Copy language file
+        shell: pwsh
+        run: Copy-Item "scripts/Languages/ChineseSimplified.isl" "scripts/" -ErrorAction SilentlyContinue
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc "scripts/compile_windows_arm64_exe-inno.iss"
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-windows-arm64
+          name: "LocalSend v${{ steps.version.outputs.version }} Windows ARM64"
+          body: |
+            Windows ARM64 build of LocalSend v${{ steps.version.outputs.version }}
+
+            Built from Flutter master channel. Requires Windows 11 ARM64 (Snapdragon X, etc.).
+
+            If you get missing DLL errors, install the [VC++ Redistributable for ARM64](https://aka.ms/vs/17/release/vc_redist.arm64.exe).
+          files: |
+            build-artifact/LocalSend-windows-arm64.zip
+            output/*.exe
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

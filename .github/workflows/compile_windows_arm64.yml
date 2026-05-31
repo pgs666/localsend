@@ -1,0 +1,58 @@
+name: Compile Windows ARM64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-11-arm
+    timeout-minutes: 60
+
+    steps:
+      - name: Fix long file paths
+        run: git config --system core.longpaths true
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Install Flutter (master channel)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "master"
+
+      - name: Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compile for Windows
+        working-directory: app
+        run: flutter build windows --release
+
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          $releaseDir = "app/build/windows/arm64/runner/Release"
+
+          # Copy VC++ DLLs from system
+          $dllDir = "app/scripts/windows/arm64"
+          New-Item -ItemType Directory -Force -Path $dllDir
+          foreach ($dll in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
+            $src = "$env:SystemRoot\System32\$dll"
+            if (Test-Path $src) { Copy-Item $src "$dllDir\$dll" }
+          }
+
+          Copy-Item app/scripts/windows/arm64/*.dll $releaseDir/ -ErrorAction SilentlyContinue
+          echo {} > "$releaseDir/settings.json"
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath "LocalSend-windows-arm64.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-arm64-build
+          path: LocalSend-windows-arm64.zip
+          retention-days: 90
