@@ -1,0 +1,115 @@
+name: Compile Windows ARM64
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.35.6"
+
+jobs:
+  build_windows_arm64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Fix long file paths
+        run: git config --system core.longpaths true
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Rust with ARM64 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Add Rust ARM64 target
+        run: rustup target add aarch64-pc-windows-msvc
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+
+      - name: Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compile for Windows ARM64
+        working-directory: app
+        run: flutter build windows --target-platform windows-arm64
+
+      - name: Verify build output exists
+        working-directory: app
+        run: |
+          if (Test-Path "build/windows/arm64/runner/Release") {
+            Write-Host "Build output directory exists"
+            Get-ChildItem "build/windows/arm64/runner/Release"
+          } else {
+            Write-Host "Build output directory NOT found"
+            Get-ChildItem "build/windows" -Recurse | Select-Object FullName
+          }
+
+      - name: Download ARM64 VC++ Redistributable
+        shell: pwsh
+        run: |
+          $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.arm64.exe"
+          Invoke-WebRequest -Uri $vcRedistUrl -OutFile "$env:TEMP\vc_redist.arm64.exe"
+
+          # Extract DLLs using 7-Zip or expand the cab files
+          # Use dark.exe (from wix) or just use expand to extract cab from the exe
+          # Alternative: download the cab files directly
+
+          # Use the simpler approach - download VC runtime ARM64 cab directly
+          $vcCabUrl = "https://aka.ms/vs/17/release/vc_arm64.cab"
+          Invoke-WebRequest -Uri $vcCabUrl -OutFile "$env:TEMP\vc_arm64.cab"
+
+          # Create temp extract dir
+          New-Item -ItemType Directory -Force -Path "$env:TEMP\vc_extract"
+
+          # Extract cab contents
+          expand "$env:TEMP\vc_arm64.cab" -F:* "$env:TEMP\vc_extract" 2>&1 | Out-Null
+
+          # Find and copy the DLLs
+          $dllDir = "app/scripts/windows/arm64"
+          New-Item -ItemType Directory -Force -Path $dllDir
+
+          $dlls = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+          foreach ($dll in $dlls) {
+            $found = Get-ChildItem -Path "$env:TEMP\vc_extract" -Recurse -Filter $dll | Select-Object -First 1
+            if ($found) {
+              Copy-Item $found.FullName "$dllDir\$dll"
+              Write-Host "Found and copied $dll"
+            } else {
+              Write-Host "WARNING: $dll not found in extracted cab"
+            }
+          }
+
+          # List what we got
+          Get-ChildItem $dllDir
+
+      - name: Add DLL files
+        working-directory: app
+        run: |
+          if (Test-Path "build/windows/arm64/runner/Release") {
+            Copy-Item ../scripts/windows/arm64/msvcp140.dll build/windows/arm64/runner/Release/
+            Copy-Item ../scripts/windows/arm64/vcruntime140.dll build/windows/arm64/runner/Release/
+            Copy-Item ../scripts/windows/arm64/vcruntime140_1.dll build/windows/arm64/runner/Release/
+          }
+
+      - name: Create empty settings.json
+        working-directory: app
+        run: echo {} > build/windows/arm64/runner/Release/settings.json
+
+      - name: Zip compiled files
+        working-directory: app
+        run: |
+          if (Test-Path "build/windows/arm64/runner/Release") {
+            Compress-Archive -Path build/windows/arm64/runner/Release/* -DestinationPath LocalSend-arm64.zip
+          }
+
+      - name: Upload zip
+        if: hashFiles('app/LocalSend-arm64.zip') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-zip-arm64-result
+          path: app/LocalSend-arm64.zip
