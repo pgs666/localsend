@@ -4,11 +4,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_windows_arm64:
+  build:
     runs-on: windows-11-arm
     timeout-minutes: 60
-    permissions:
-      contents: write
 
     steps:
       - name: Fix long file paths
@@ -27,12 +25,6 @@ jobs:
         with:
           channel: "master"
 
-      - name: Check Flutter setup
-        shell: pwsh
-        run: |
-          dart --version
-          flutter --version
-
       - name: Dependencies
         working-directory: app
         run: flutter pub get
@@ -41,121 +33,26 @@ jobs:
         working-directory: app
         run: flutter build windows --release
 
-      - name: Check build output
-        shell: pwsh
-        working-directory: app
-        run: |
-          if (Test-Path "build/windows/arm64/runner/Release") {
-            Write-Host "ARM64 build output found!"
-            Get-ChildItem "build/windows/arm64/runner/Release" | Select-Object Name, Length
-          } else {
-            Write-Host "ERROR: ARM64 build output not found!"
-            exit 1
-          }
-
-      - name: Download ARM64 VC++ DLLs
-        shell: pwsh
-        run: |
-          # Download the VC++ redistributable cab directly
-          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.arm64.exe" -OutFile "$env:TEMP\vc_redist.arm64.exe"
-
-          # Use dark.exe or just copy from system32 on ARM64 runner
-          # On ARM64 Windows runner, the native DLLs should be in System32
-          $dllDir = "app/scripts/windows/arm64"
-          New-Item -ItemType Directory -Force -Path $dllDir
-
-          # Copy native ARM64 DLLs from the runner's system
-          foreach ($dll in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
-            $src = "$env:SystemRoot\System32\$dll"
-            if (Test-Path $src) {
-              Copy-Item $src "$dllDir\$dll"
-              Write-Host "Copied $dll from System32"
-            }
-          }
-
-          Get-ChildItem $dllDir
-
       - name: Package ZIP
         shell: pwsh
-        working-directory: app
         run: |
-          $releaseDir = "build/windows/arm64/runner/Release"
-          Copy-Item ../scripts/windows/arm64/*.dll $releaseDir/ -ErrorAction SilentlyContinue
+          $releaseDir = "app/build/windows/arm64/runner/Release"
+
+          # Copy VC++ DLLs from system
+          $dllDir = "app/scripts/windows/arm64"
+          New-Item -ItemType Directory -Force -Path $dllDir
+          foreach ($dll in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
+            $src = "$env:SystemRoot\System32\$dll"
+            if (Test-Path $src) { Copy-Item $src "$dllDir\$dll" }
+          }
+
+          Copy-Item app/scripts/windows/arm64/*.dll $releaseDir/ -ErrorAction SilentlyContinue
           echo {} > "$releaseDir/settings.json"
           Compress-Archive -Path "$releaseDir/*" -DestinationPath "LocalSend-windows-arm64.zip"
 
-      - name: Prepare Inno Setup staging directory
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path "staging"
-          Copy-Item -Path "app/build/windows/arm64/runner/Release/*" -Destination "staging/" -Recurse
-          Copy-Item -Path "app/scripts/windows/arm64/*.dll" -Destination "staging/" -ErrorAction SilentlyContinue
-          echo {} > "staging/settings.json"
-          Copy-Item -Path "app/assets/packaging/logo.ico" -Destination "staging/"
-          Write-Host "Staging directory contents:"
-          Get-ChildItem "staging/" | Select-Object Name
-
-      - name: Install Inno Setup
-        shell: pwsh
-        run: |
-          # Download and install Inno Setup
-          choco install innosetup -y --no-progress
-
-      - name: Build Inno Setup installer
-        shell: pwsh
-        run: |
-          # Copy language file to scripts directory
-          Copy-Item "scripts/Languages/ChineseSimplified.isl" "scripts/" -ErrorAction SilentlyContinue
-
-          # Verify staging directory
-          Write-Host "Staging directory:"
-          Get-ChildItem "staging/" | Select-Object Name
-          Write-Host "Logo exists: $(Test-Path 'staging/logo.ico')"
-
-          # Run Inno Setup
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-          }
-          Write-Host "Using ISCC: $iscc"
-          Write-Host "PWD: $(Get-Location)"
-          & $iscc /O"$PWD\output" "$PWD\scripts\compile_windows_arm64_exe-inno.iss"
-
-          # Verify output
-          Write-Host "Output directory:"
-          Get-ChildItem "output/" -ErrorAction SilentlyContinue
-
-      - name: Get version
-        id: get_version
-        shell: bash
-        run: |
-          VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.get_version.outputs.version }}-windows-arm64
-          name: LocalSend v${{ steps.get_version.outputs.version }} Windows ARM64
-          body: |
-            Windows ARM64 build of LocalSend v${{ steps.get_version.outputs.version }}
-
-            **Note:** This build uses Flutter master channel as ARM64 engine artifacts are not yet available on stable.
-            Requires Windows 11 ARM64 (Snapdragon X, etc.)
-
-            If you get missing DLL errors, install the [Visual C++ Redistributable for ARM64](https://aka.ms/vs/17/release/vc_redist.arm64.exe).
-          files: |
-            app/LocalSend-windows-arm64.zip
-            output/*.exe
-          draft: false
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifacts
+      - name: Upload build artifact
         uses: actions/upload-artifact@v6
         with:
-          name: windows-arm64-installer
-          path: |
-            app/LocalSend-windows-arm64.zip
-            output/*.exe
+          name: windows-arm64-build
+          path: LocalSend-windows-arm64.zip
+          retention-days: 90
