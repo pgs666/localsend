@@ -3,10 +3,6 @@ name: Compile Windows ARM64
 on:
   workflow_dispatch:
 
-env:
-  FLUTTER_VERSION: "3.35.6"
-  ENGINE_VERSION: "d2913632a4578ee4d0b8b1c4a69888c8a0672c4b"
-
 jobs:
   build_windows_arm64:
     runs-on: windows-11-arm
@@ -24,62 +20,16 @@ jobs:
         with:
           targets: aarch64-pc-windows-msvc
 
-      - name: Install Flutter (x64)
+      - name: Install Flutter (master channel)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: "stable"
-          architecture: x64
+          channel: "master"
 
-      - name: Replace Dart with ARM64 version
-        shell: pwsh
-        run: |
-          $flutterRoot = "$env:FLUTTER_ROOT"
-          $dartSdkDir = "$flutterRoot/bin/cache/dart-sdk"
-          Invoke-WebRequest -Uri "https://storage.googleapis.com/dart-archive/channels/stable/release/latest/sdk/dartsdk-windows-arm64-release.zip" -OutFile "$env:TEMP\dart-arm64.zip"
-          Remove-Item $dartSdkDir -Recurse -Force
-          Expand-Archive -Path "$env:TEMP\dart-arm64.zip" -DestinationPath "$flutterRoot/bin/cache/"
-          & "$dartSdkDir/bin/dart.exe" --version
-
-      - name: Copy x64 engine artifacts to ARM64 directories
-        shell: pwsh
-        run: |
-          $engineDir = "$env:FLUTTER_ROOT/bin/cache/artifacts/engine"
-
-          # Check what x64 directories exist
-          Write-Host "Engine artifact directories:"
-          Get-ChildItem $engineDir -Directory | Where-Object { $_.Name -like "windows*" } | ForEach-Object { Write-Host $_.FullName }
-
-          # Find the x64 artifact directories
-          $x64Artifacts = "$engineDir/windows-x64"
-          $x64Release = "$engineDir/windows-x64-release"
-          $arm64Artifacts = "$engineDir/windows-arm64"
-          $arm64Release = "$engineDir/windows-arm64-release"
-
-          # Create ARM64 directories and copy x64 artifacts
-          if (Test-Path $x64Artifacts) {
-            New-Item -ItemType Directory -Force -Path $arm64Artifacts
-            Copy-Item "$x64Artifacts/*" $arm64Artifacts -Recurse -Force
-            Write-Host "Copied x64 artifacts to windows-arm64"
-          }
-
-          if (Test-Path $x64Release) {
-            New-Item -ItemType Directory -Force -Path $arm64Release
-            Copy-Item "$x64Release/*" $arm64Release -Recurse -Force
-            Write-Host "Copied x64-release artifacts to windows-arm64-release"
-          }
-
-          # List what we have now
-          Write-Host "ARM64 artifacts:"
-          Get-ChildItem $arm64Artifacts -ErrorAction SilentlyContinue | Select-Object Name
-          Write-Host "ARM64-release artifacts:"
-          Get-ChildItem $arm64Release -ErrorAction SilentlyContinue | Select-Object Name
-
-      - name: Check Flutter after setup
+      - name: Check Flutter setup
         shell: pwsh
         run: |
           dart --version
-          flutter --version 2>&1 | Select-String -Pattern "Flutter|Dart|Engine"
+          flutter --version
 
       - name: Dependencies
         working-directory: app
@@ -87,20 +37,17 @@ jobs:
 
       - name: Compile for Windows
         working-directory: app
-        run: flutter build windows
+        run: flutter build windows --release
 
       - name: Check build output
         shell: pwsh
         working-directory: app
         run: |
-          Write-Host "Checking build output directories:"
+          Write-Host "Build directories:"
           Get-ChildItem "build/windows" -ErrorAction SilentlyContinue
           if (Test-Path "build/windows/arm64/runner/Release") {
             Write-Host "ARM64 build output found!"
-            Get-ChildItem "build/windows/arm64/runner/Release"
-          }
-          if (Test-Path "build/windows/x64/runner/Release") {
-            Write-Host "x64 build output found (unexpected)"
+            Get-ChildItem "build/windows/arm64/runner/Release" | Select-Object Name, Length
           }
 
       - name: Download ARM64 VC++ Redistributable DLLs
@@ -121,15 +68,19 @@ jobs:
         shell: pwsh
         working-directory: app
         run: |
-          $arch = if (Test-Path "build/windows/arm64/runner/Release") { "arm64" } else { "x64" }
-          $releaseDir = "build/windows/$arch/runner/Release"
-          Copy-Item ../scripts/windows/arm64/*.dll $releaseDir/ -ErrorAction SilentlyContinue
-          echo {} > "$releaseDir/settings.json"
-          Compress-Archive -Path "$releaseDir/*" -DestinationPath "LocalSend-windows-$arch.zip"
+          $releaseDir = "build/windows/arm64/runner/Release"
+          if (Test-Path $releaseDir) {
+            Copy-Item ../scripts/windows/arm64/*.dll $releaseDir/ -ErrorAction SilentlyContinue
+            echo {} > "$releaseDir/settings.json"
+            Compress-Archive -Path "$releaseDir/*" -DestinationPath "LocalSend-windows-arm64.zip"
+          } else {
+            Write-Host "ERROR: ARM64 release directory not found!"
+            exit 1
+          }
 
       - name: Upload zip
         if: success()
         uses: actions/upload-artifact@v6
         with:
           name: windows-arm64-result
-          path: app/LocalSend-windows-*.zip
+          path: app/LocalSend-windows-arm64.zip
