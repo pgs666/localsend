@@ -75,7 +75,7 @@ jobs:
             If you get missing DLL errors, install the [VC++ Redistributable for ARM64](https://aka.ms/vs/17/release/vc_redist.arm64.exe).
           files: |
             build-artifact/LocalSend-windows-arm64.zip
-            scripts/output/*.exe
+            output/*.exe
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
