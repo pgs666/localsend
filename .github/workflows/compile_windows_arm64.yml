@@ -47,13 +47,11 @@ jobs:
           # Download ARM64 Dart SDK
           Invoke-WebRequest -Uri "https://storage.googleapis.com/dart-archive/channels/stable/release/latest/sdk/dartsdk-windows-arm64-release.zip" -OutFile "$env:TEMP\dart-arm64.zip"
 
-          # Backup current (x64) Dart SDK
-          Rename-Item $dartSdkDir "$dartSdkDir.x64backup"
+          # Remove current (x64) Dart SDK
+          Remove-Item $dartSdkDir -Recurse -Force
 
-          # Extract ARM64 Dart SDK
+          # Extract ARM64 Dart SDK (zip contains dart-sdk/ folder)
           Expand-Archive -Path "$env:TEMP\dart-arm64.zip" -DestinationPath "$flutterRoot/bin/cache/"
-          # The zip extracts to dart-sdk/
-          Rename-Item "$flutterRoot/bin/cache/dart-sdk" $dartSdkDir
 
           # Verify
           & "$dartSdkDir/bin/dart.exe" --version
