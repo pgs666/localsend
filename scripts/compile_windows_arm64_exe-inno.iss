@@ -37,7 +37,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\staging\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\staging\{#MyAppExeName}.manifest"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\staging\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\staging\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\staging\settings.json"; DestDir: "{app}"; Flags: ignoreversion
