@@ -5,10 +5,12 @@ on:
 
 env:
   FLUTTER_VERSION: "3.35.6"
+  ENGINE_VERSION: "d2913632a4578ee4d0b8b1c4a69888c8a0672c4b"
 
 jobs:
   build_windows_arm64:
     runs-on: windows-11-arm
+    timeout-minutes: 60
 
     steps:
       - name: Fix long file paths
@@ -16,11 +18,6 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Check host architecture
-        shell: pwsh
-        run: |
-          Write-Host "PROCESSOR_ARCHITECTURE: $env:PROCESSOR_ARCHITECTURE"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -37,26 +34,48 @@ jobs:
       - name: Replace Dart with ARM64 version
         shell: pwsh
         run: |
-          # Flutter installs Dart at $FLUTTER_ROOT/bin/cache/dart-sdk/
           $flutterRoot = "$env:FLUTTER_ROOT"
           $dartSdkDir = "$flutterRoot/bin/cache/dart-sdk"
-
-          Write-Host "Flutter root: $flutterRoot"
-          Write-Host "Current Dart SDK dir: $dartSdkDir"
-
-          # Download ARM64 Dart SDK
           Invoke-WebRequest -Uri "https://storage.googleapis.com/dart-archive/channels/stable/release/latest/sdk/dartsdk-windows-arm64-release.zip" -OutFile "$env:TEMP\dart-arm64.zip"
-
-          # Remove current (x64) Dart SDK
           Remove-Item $dartSdkDir -Recurse -Force
-
-          # Extract ARM64 Dart SDK (zip contains dart-sdk/ folder)
           Expand-Archive -Path "$env:TEMP\dart-arm64.zip" -DestinationPath "$flutterRoot/bin/cache/"
-
-          # Verify
           & "$dartSdkDir/bin/dart.exe" --version
 
-      - name: Check Flutter after Dart swap
+      - name: Copy x64 engine artifacts to ARM64 directories
+        shell: pwsh
+        run: |
+          $engineDir = "$env:FLUTTER_ROOT/bin/cache/artifacts/engine"
+
+          # Check what x64 directories exist
+          Write-Host "Engine artifact directories:"
+          Get-ChildItem $engineDir -Directory | Where-Object { $_.Name -like "windows*" } | ForEach-Object { Write-Host $_.FullName }
+
+          # Find the x64 artifact directories
+          $x64Artifacts = "$engineDir/windows-x64"
+          $x64Release = "$engineDir/windows-x64-release"
+          $arm64Artifacts = "$engineDir/windows-arm64"
+          $arm64Release = "$engineDir/windows-arm64-release"
+
+          # Create ARM64 directories and copy x64 artifacts
+          if (Test-Path $x64Artifacts) {
+            New-Item -ItemType Directory -Force -Path $arm64Artifacts
+            Copy-Item "$x64Artifacts/*" $arm64Artifacts -Recurse -Force
+            Write-Host "Copied x64 artifacts to windows-arm64"
+          }
+
+          if (Test-Path $x64Release) {
+            New-Item -ItemType Directory -Force -Path $arm64Release
+            Copy-Item "$x64Release/*" $arm64Release -Recurse -Force
+            Write-Host "Copied x64-release artifacts to windows-arm64-release"
+          }
+
+          # List what we have now
+          Write-Host "ARM64 artifacts:"
+          Get-ChildItem $arm64Artifacts -ErrorAction SilentlyContinue | Select-Object Name
+          Write-Host "ARM64-release artifacts:"
+          Get-ChildItem $arm64Release -ErrorAction SilentlyContinue | Select-Object Name
+
+      - name: Check Flutter after setup
         shell: pwsh
         run: |
           dart --version
@@ -81,7 +100,7 @@ jobs:
             Get-ChildItem "build/windows/arm64/runner/Release"
           }
           if (Test-Path "build/windows/x64/runner/Release") {
-            Write-Host "x64 build output found (not ARM64)"
+            Write-Host "x64 build output found (unexpected)"
           }
 
       - name: Download ARM64 VC++ Redistributable DLLs
