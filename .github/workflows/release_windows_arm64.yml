@@ -26,7 +26,7 @@ jobs:
         run: |
           gh run download ${{ inputs.build_run_id }} \
             --repo ${{ github.repository }} \
-            --name windows-arm64-result \
+            --name windows-arm64-build \
             --dir build-artifact
 
       - name: Extract build to staging
