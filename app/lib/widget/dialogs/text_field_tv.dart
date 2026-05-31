@@ -33,7 +33,7 @@ class _TextFieldTvState extends State<TextFieldTv> with Refena {
       return TextButton(
         style: TextButton.styleFrom(
           backgroundColor: Theme.of(context).inputDecorationTheme.fillColor,
-          shape: RoundedRectangleBorder(borderRadius: Theme.of(context).inputDecorationTheme.borderRadius),
+          shape: RoundedRectangleBorder(borderRadius: const BorderRadius.all(Radius.circular(8))),
           foregroundColor: Theme.of(context).colorScheme.onSurface,
         ),
         onPressed: () async {

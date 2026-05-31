@@ -198,7 +198,7 @@ class SettingsTab extends StatelessWidget {
                     child: TextButton(
                       style: TextButton.styleFrom(
                         backgroundColor: Theme.of(context).inputDecorationTheme.fillColor,
-                        shape: RoundedRectangleBorder(borderRadius: Theme.of(context).inputDecorationTheme.borderRadius),
+                        shape: RoundedRectangleBorder(borderRadius: const BorderRadius.all(Radius.circular(8))),
                         foregroundColor: Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: () async {
@@ -284,7 +284,7 @@ class SettingsTab extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: Theme.of(context).inputDecorationTheme.fillColor,
-                      borderRadius: Theme.of(context).inputDecorationTheme.borderRadius,
+                      borderRadius: const BorderRadius.all(Radius.circular(8)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -618,7 +618,7 @@ class _BooleanEntry extends StatelessWidget {
             height: 50,
             decoration: BoxDecoration(
               color: theme.inputDecorationTheme.fillColor,
-              borderRadius: theme.inputDecorationTheme.borderRadius,
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
             ),
           ),
           Positioned.fill(
@@ -658,7 +658,7 @@ class _ButtonEntry extends StatelessWidget {
       child: TextButton(
         style: TextButton.styleFrom(
           backgroundColor: Theme.of(context).inputDecorationTheme.fillColor,
-          shape: RoundedRectangleBorder(borderRadius: Theme.of(context).inputDecorationTheme.borderRadius),
+          shape: RoundedRectangleBorder(borderRadius: const BorderRadius.all(Radius.circular(8))),
           foregroundColor: Theme.of(context).colorScheme.onSurface,
         ),
         onPressed: onTap,
