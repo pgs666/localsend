@@ -79,7 +79,8 @@ install(FILES
   "localsend_msix_helper.msix"
   "install_msix_helper.ps1"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
-  COMPONENT Runtime)
+  COMPONENT Runtime
+  OPTIONAL)
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
